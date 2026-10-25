@@ -88,7 +88,7 @@ private fun AppRow(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (app.detached) {
-                MaterialTheme.colorScheme.surfaceContainerHigh
+                MaterialTheme.colorScheme.surfaceContainer
             } else {
                 MaterialTheme.colorScheme.surfaceContainerLow
             }
@@ -335,6 +335,7 @@ private fun DetachScreen(
                     value = query, onValueChange = { query = it },
                     modifier = Modifier.fillMaxWidth(), singleLine = true,
                     placeholder = { Text("Search apps or package names") },
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "Search apps") },
                     trailingIcon = {
                         if (query.isNotEmpty()) Icon(Icons.Filled.Close, contentDescription = "Clear search",
                             modifier = Modifier.clip(CircleShape).clickable { query = ""; focusManager.clearFocus() }.padding(4.dp))
