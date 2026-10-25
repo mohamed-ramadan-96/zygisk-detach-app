@@ -32,8 +32,8 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
-      - name: Build debug APK
-        run: ./gradlew --no-daemon assembleDebug
+      - name: Build release APK (signed with the existing debug key)
+        run: ./gradlew --no-daemon assembleRelease
 
       - name: Run unit tests
         run: ./gradlew --no-daemon test
@@ -41,8 +41,8 @@ jobs:
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: zygisk-detach-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          name: zygisk-detach-stable-release-apk
+          path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 14
 
