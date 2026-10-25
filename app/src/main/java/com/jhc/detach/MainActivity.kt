@@ -2,6 +2,7 @@ package com.jhc.detach
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.widget.Toast
@@ -9,17 +10,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -27,24 +18,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -62,15 +40,23 @@ data class DetachedApp(
     val packageName: String,
     val label: String,
     var detached: Boolean = false,
-    val installed: Boolean = true
+    val installed: Boolean = true,
+    val isSystem: Boolean = false
 )
+
+private enum class AppFilter(val title: String) {
+    ALL("All apps"), USER("User apps"), SYSTEM("System apps"), DETACHED("Detached only")
+}
+private enum class AppSort(val title: String) {
+    NAME_ASC("Name (A–Z)"), NAME_DESC("Name (Z–A)"),
+    SELECTED_FIRST("Selected first"), PACKAGE_NAME("Package name")
+}
 
 class Toaster(private val context: Context) {
     fun toast(msg: String, delay: Int = Toast.LENGTH_SHORT) {
         Toast.makeText(context, msg, delay).show()
     }
 }
-
 fun runShell(cmd: String, toaster: Toaster): String {
     val op = Shell.cmd(cmd).exec()
     if (op.code != 0) {
@@ -79,7 +65,6 @@ fun runShell(cmd: String, toaster: Toaster): String {
     }
     return op.out.joinToString("\n")
 }
-
 fun String.splitn() = if (isEmpty()) emptyList() else split('\n')
 
 @Composable
@@ -129,12 +114,30 @@ private fun DetachScreen(
     onApply: (List<DetachedApp>) -> Unit
 ) {
     var query by remember { mutableStateOf("") }
-    var detachedOnly by remember { mutableStateOf(false) }
+    var selectedFilter by remember { mutableStateOf(AppFilter.ALL) }
+    var selectedSort by remember { mutableStateOf(AppSort.SELECTED_FIRST) }
+    var filterMenuExpanded by remember { mutableStateOf(false) }
+    var sortMenuExpanded by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
     val detachedCount = apps.value.count { it.detached }
+
     val visibleApps = apps.value.filter { app ->
-        (!detachedOnly || app.detached) &&
-            (app.label.contains(query, true) || app.packageName.contains(query, true))
+        val matchesFilter = when (selectedFilter) {
+            AppFilter.ALL -> true
+            AppFilter.USER -> app.installed && !app.isSystem
+            AppFilter.SYSTEM -> app.installed && app.isSystem
+            AppFilter.DETACHED -> app.detached
+        }
+        matchesFilter && (app.label.contains(query, true) || app.packageName.contains(query, true))
+    }.let { filtered ->
+        when (selectedSort) {
+            AppSort.NAME_ASC -> filtered.sortedBy { it.label.lowercase() }
+            AppSort.NAME_DESC -> filtered.sortedByDescending { it.label.lowercase() }
+            AppSort.SELECTED_FIRST -> filtered.sortedWith(
+                compareByDescending<DetachedApp> { it.detached }.thenBy { it.label.lowercase() }
+            )
+            AppSort.PACKAGE_NAME -> filtered.sortedBy { it.packageName.lowercase() }
+        }
     }
 
     Scaffold(
@@ -160,11 +163,47 @@ private fun DetachScreen(
     ) { innerPadding ->
         Column(Modifier.fillMaxSize().padding(innerPadding)) {
             Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 8.dp)) {
-                Text("Zygisk Detach", style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
-                Spacer(Modifier.height(4.dp))
-                Text("Choose which apps should stay out of Play Store updates.",
-                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Zygisk Detach", style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                        Spacer(Modifier.height(4.dp))
+                        Text("Choose which apps should stay out of Play Store updates.",
+                            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Box {
+                        IconButton(onClick = { filterMenuExpanded = true }) {
+                            Icon(Icons.Filled.FilterList, contentDescription = "Filter apps",
+                                tint = if (selectedFilter != AppFilter.ALL) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurface)
+                        }
+                        DropdownMenu(expanded = filterMenuExpanded, onDismissRequest = { filterMenuExpanded = false }) {
+                            AppFilter.values().forEach { filter ->
+                                DropdownMenuItem(
+                                    text = { Text(filter.title) },
+                                    leadingIcon = { if (selectedFilter == filter) Icon(Icons.Filled.Check, null) },
+                                    onClick = { selectedFilter = filter; filterMenuExpanded = false }
+                                )
+                            }
+                        }
+                    }
+                    Box {
+                        IconButton(onClick = { sortMenuExpanded = true }) {
+                            Icon(Icons.Filled.Sort, contentDescription = "Sort apps",
+                                tint = if (selectedSort != AppSort.SELECTED_FIRST) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurface)
+                        }
+                        DropdownMenu(expanded = sortMenuExpanded, onDismissRequest = { sortMenuExpanded = false }) {
+                            AppSort.values().forEach { sort ->
+                                DropdownMenuItem(
+                                    text = { Text(sort.title) },
+                                    leadingIcon = { if (selectedSort == sort) Icon(Icons.Filled.Check, null) },
+                                    onClick = { selectedSort = sort; sortMenuExpanded = false }
+                                )
+                            }
+                        }
+                    }
+                }
                 Spacer(Modifier.height(15.dp))
                 Card(shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
@@ -185,18 +224,18 @@ private fun DetachScreen(
                     value = query, onValueChange = { query = it },
                     modifier = Modifier.fillMaxWidth(), singleLine = true,
                     placeholder = { Text("Search apps or package names") },
-                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "Search") },
                     trailingIcon = {
                         if (query.isNotEmpty()) Icon(Icons.Filled.Close, contentDescription = "Clear search",
                             modifier = Modifier.clip(CircleShape).clickable { query = ""; focusManager.clearFocus() }.padding(4.dp))
                     },
                     shape = RoundedCornerShape(18.dp)
                 )
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween) {
-                    FilterChip(selected = detachedOnly, onClick = { detachedOnly = !detachedOnly },
-                        label = { Text("Detached only") })
+                    Text("${selectedFilter.title} · ${selectedSort.title}",
+                        style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text("${visibleApps.size} apps", style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -207,7 +246,7 @@ private fun DetachScreen(
                         Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(36.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(10.dp))
-                        Text(if (query.isNotBlank()) "No matching apps" else "Nothing detached yet",
+                        Text(if (query.isNotBlank()) "No matching apps" else "No apps in this filter",
                             style = MaterialTheme.typography.titleMedium)
                         Text("Try another search or change the filter.", style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -215,7 +254,7 @@ private fun DetachScreen(
                 }
             } else {
                 LazyColumn(Modifier.fillMaxSize(),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 2.dp, bottom = 12.dp)) {
+                    contentPadding = PaddingValues(top = 2.dp, bottom = 12.dp)) {
                     items(visibleApps, key = { it.packageName }) { app ->
                         AppRow(app, packageManager, uninstalledAppBitmap) { selected ->
                             app.detached = selected
@@ -246,8 +285,13 @@ class MainActivity : ComponentActivity() {
         }
 
         val apps = packageManager.getInstalledPackages(0).mapNotNull { info ->
-            info.applicationInfo?.let {
-                DetachedApp(info.packageName, packageManager.getApplicationLabel(it).toString())
+            info.applicationInfo?.let { applicationInfo ->
+                DetachedApp(
+                    packageName = info.packageName,
+                    label = packageManager.getApplicationLabel(applicationInfo).toString(),
+                    isSystem = applicationInfo.flags and
+                        (ApplicationInfo.FLAG_SYSTEM or ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+                )
             }
         }.sortedBy { it.label }.toMutableList()
         val detachedFromModule = try {
