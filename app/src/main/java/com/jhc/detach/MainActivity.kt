@@ -15,6 +15,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.selection.toggleable
@@ -27,6 +28,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,6 +43,7 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.core.view.WindowCompat
 import com.jhc.detach.ui.theme.ZygiskdetachTheme
 import com.topjohnwu.superuser.Shell
+import kotlinx.coroutines.launch
 
 data class DetachedApp(
     val packageName: String,
@@ -154,6 +157,8 @@ private fun DetachScreen(
     var sortMenuExpanded by remember { mutableStateOf(false) }
     var moreMenuExpanded by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
+    val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
     val detachedCount = apps.value.count { it.detached }
     // Keep "Selected first" order stable while the user is editing; refresh it only after Apply.
     var appliedSelection by remember { mutableStateOf(apps.value.associate { it.packageName to it.detached }) }
@@ -210,8 +215,21 @@ private fun DetachScreen(
                     Button(
                         onClick = {
                             val current = apps.value
+                            // Preserve the viewport, not the selected app key: selected-first sorting
+                            // can move a deselected row far down the list after Apply.
+                            val visibleIndex = listState.firstVisibleItemIndex
+                            val visibleOffset = listState.firstVisibleItemScrollOffset
                             onApply(current)
                             appliedSelection = current.associate { it.packageName to it.detached }
+                            coroutineScope.launch {
+                                withFrameNanos { }
+                                if (visibleApps.isNotEmpty()) {
+                                    listState.scrollToItem(
+                                        visibleIndex.coerceIn(0, visibleApps.lastIndex),
+                                        visibleOffset
+                                    )
+                                }
+                            }
                         },
                         modifier = Modifier.height(58.dp),
                         shape = RoundedCornerShape(22.dp),
@@ -303,8 +321,11 @@ private fun DetachScreen(
                     }
                 }
             } else {
-                LazyColumn(Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(top = 2.dp, bottom = 12.dp)) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(top = 2.dp, bottom = 12.dp)
+                ) {
                     items(visibleApps, key = { it.packageName }) { app ->
                         AppRow(app, packageManager, uninstalledAppBitmap) { selected ->
                             apps.value = apps.value.map { current ->
@@ -323,10 +344,6 @@ class MainActivity : ComponentActivity() {
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Keep status/navigation system icons visible on the dark app background.
-        WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = false
-        WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightNavigationBars = false
-        window.statusBarColor = android.graphics.Color.rgb(15, 15, 17)
         val toaster = Toaster(applicationContext)
         Shell.setDefaultBuilder(Shell.Builder.create().setFlags(Shell.FLAG_MOUNT_MASTER))
         if (!Shell.getShell().isRoot) {
