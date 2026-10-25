@@ -15,10 +15,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Android
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.*
@@ -30,6 +33,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
@@ -39,7 +43,7 @@ import com.topjohnwu.superuser.Shell
 data class DetachedApp(
     val packageName: String,
     val label: String,
-    var detached: Boolean = false,
+    val detached: Boolean = false,
     val installed: Boolean = true,
     val isSystem: Boolean = false
 )
@@ -80,8 +84,8 @@ private fun AppRow(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().height(82.dp)
-                .clickable { onDetachedChange(!app.detached) }
+            modifier = Modifier.fillMaxWidth().heightIn(min = 82.dp)
+                .toggleable(value = app.detached, role = Role.Checkbox, onValueChange = onDetachedChange)
                 .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -101,7 +105,7 @@ private fun AppRow(
                 if (!app.installed) Text("Not installed", style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.tertiary)
             }
-            Checkbox(checked = app.detached, onCheckedChange = onDetachedChange)
+            Checkbox(checked = app.detached, onCheckedChange = null)
         }
     }
 }
@@ -111,6 +115,7 @@ private fun DetachScreen(
     packageManager: PackageManager,
     apps: MutableState<List<DetachedApp>>,
     uninstalledAppBitmap: ImageBitmap,
+    appLogo: ImageBitmap,
     onApply: (List<DetachedApp>) -> Unit
 ) {
     var query by remember { mutableStateOf("") }
@@ -165,8 +170,18 @@ private fun DetachScreen(
             Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 8.dp)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("Zygisk Detach", style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Image(bitmap = appLogo, contentDescription = "Zygisk Detach logo", modifier = Modifier.size(56.dp))
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("Zygisk Detach", style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground,
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text("Detach selected apps from Zygisk", style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                        }
                         Spacer(Modifier.height(4.dp))
                         Text("Choose which apps should stay out of Play Store updates.",
                             style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -197,7 +212,7 @@ private fun DetachScreen(
                             AppSort.values().forEach { sort ->
                                 DropdownMenuItem(
                                     text = { Text(sort.title) },
-                                    leadingIcon = { if (selectedSort == sort) Icon(Icons.Filled.Check, null) },
+                                    leadingIcon = { Checkbox(checked = selectedSort == sort, onCheckedChange = null) },
                                     onClick = { selectedSort = sort; sortMenuExpanded = false }
                                 )
                             }
@@ -257,8 +272,10 @@ private fun DetachScreen(
                     contentPadding = PaddingValues(top = 2.dp, bottom = 12.dp)) {
                     items(visibleApps, key = { it.packageName }) { app ->
                         AppRow(app, packageManager, uninstalledAppBitmap) { selected ->
-                            app.detached = selected
-                            apps.value = apps.value.toList()
+                            apps.value = apps.value.map { current ->
+                                if (current.packageName == app.packageName) current.copy(detached = selected)
+                                else current
+                            }
                         }
                     }
                 }
@@ -316,6 +333,7 @@ class MainActivity : ComponentActivity() {
                         packageManager = packageManager,
                         apps = appState,
                         uninstalledAppBitmap = getDrawable(R.mipmap.unistalled_app)!!.toBitmap(96, 96).asImageBitmap(),
+                        appLogo = getDrawable(R.mipmap.ic_launcher)!!.toBitmap(192, 192).asImageBitmap(),
                         onApply = { currentApps ->
                             val packages = currentApps.filter { it.detached }.map { it.packageName }
                             if (packages.isEmpty()) {
