@@ -260,7 +260,14 @@ private fun DetachScreen(
                             color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = CircleShape) {
                             Box(contentAlignment = Alignment.Center) { Icon(Icons.Filled.Sort, "Sort apps") }
                         }
-                        DropdownMenu(expanded = sortMenuExpanded, onDismissRequest = { sortMenuExpanded = false }) {
+                        DropdownMenu(
+                            expanded = sortMenuExpanded,
+                            onDismissRequest = { sortMenuExpanded = false },
+                            shape = RoundedCornerShape(24.dp),
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            tonalElevation = 6.dp,
+                            shadowElevation = 8.dp
+                        ) {
                             AppSort.values().forEach { sort ->
                                 DropdownMenuItem(text = { Text(sort.title) },
                                     leadingIcon = { Checkbox(checked = selectedSort == sort, onCheckedChange = null) },
@@ -274,7 +281,14 @@ private fun DetachScreen(
                             color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = CircleShape) {
                             Box(contentAlignment = Alignment.Center) { Icon(Icons.Filled.MoreVert, "More options") }
                         }
-                        DropdownMenu(expanded = moreMenuExpanded, onDismissRequest = { moreMenuExpanded = false }) {
+                        DropdownMenu(
+                            expanded = moreMenuExpanded,
+                            onDismissRequest = { moreMenuExpanded = false },
+                            shape = RoundedCornerShape(24.dp),
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            tonalElevation = 6.dp,
+                            shadowElevation = 8.dp
+                        ) {
                             DropdownMenuItem(text = { Text("Reset filter and sorting") },
                                 onClick = { selectedFilter = AppFilter.ALL; selectedSort = AppSort.SELECTED_FIRST; query = ""; moreMenuExpanded = false })
                         }
