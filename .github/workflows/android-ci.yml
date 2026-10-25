@@ -2,9 +2,12 @@ name: Android CI
 
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - "v*"
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: android-ci-${{ github.ref }}
@@ -45,6 +48,15 @@ jobs:
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 14
+
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Zygisk Detach ${{ github.ref_name }}
+          generate_release_notes: true
+          files: app/build/outputs/apk/release/*.apk
 
       - name: Upload test reports
         if: always()
