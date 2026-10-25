@@ -7,21 +7,19 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -30,177 +28,35 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
 import com.jhc.detach.ui.theme.ZygiskdetachTheme
 import com.topjohnwu.superuser.Shell
-
-@Composable
-fun AppsList(
-    packageManager: PackageManager,
-    renderedApps: MutableState<List<DetachedApp>>,
-    uninstalledAppBitmap: ImageBitmap
-) {
-
-    LazyColumn {
-        items(renderedApps.value, key = { it.packageName }) { app ->
-            OutlinedCard(
-                modifier = Modifier.padding(3.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .height(85.dp)
-                        .padding(3.dp)
-                ) {
-                    Image(
-                        modifier = Modifier
-                            .fillMaxHeight(0.6f)
-                            .padding(5.dp)
-                            .padding(PaddingValues(start = 5.dp, end = 10.dp)),
-                        bitmap =
-                            if (app.installed)
-                                try {
-                                    packageManager.getApplicationIcon(app.packageName)
-                                        .toBitmap()
-                                        .asImageBitmap()
-                                } catch (_: Exception) {
-                                    uninstalledAppBitmap
-                                } else uninstalledAppBitmap,
-                        contentDescription = ""
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(text = app.label, modifier = Modifier.wrapContentHeight())
-                            Text(
-                                maxLines = 1,
-                                text = app.packageName,
-                                fontSize = 14.sp,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier
-                                    .wrapContentHeight()
-                                    .alpha(0.8f)
-                            )
-                        }
-                        val checkedState = remember { mutableStateOf(app.detached) }
-                        Checkbox(
-                            checked = checkedState.value, onCheckedChange = {
-                                checkedState.value = it
-                                app.detached = it
-                            }, modifier = Modifier
-                                .wrapContentSize()
-                                .padding(
-                                    PaddingValues(end = 5.dp)
-                                )
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-
-@Composable
-fun SearchBar(
-    detachedApps: MutableState<List<DetachedApp>>, renderedApps: MutableState<List<DetachedApp>>
-) {
-    var text by remember { mutableStateOf("") }
-    val f = LocalFocusManager.current
-    OutlinedTextField(
-        leadingIcon = {
-            Icon(
-                Icons.Filled.Search, ""
-            )
-        },
-        trailingIcon = {
-            Icon(
-                Icons.Filled.Close, "", modifier = Modifier
-                    .clip(CircleShape)
-                    .clickable(onClick = {
-                        text = ""
-                        renderedApps.value = detachedApps.value
-                        f.clearFocus()
-                    })
-            )
-        },
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 5.dp, start = 10.dp, end = 10.dp, top = 5.dp),
-        value = text,
-        onValueChange = {
-            text = it
-            val searchText = it.lowercase()
-            if (it.isNotEmpty()) {
-                renderedApps.value = detachedApps.value.filter { app ->
-                    app.packageName.lowercase().contains(searchText) || app.label.lowercase()
-                        .contains(searchText)
-                }
-            }
-        },
-        label = { Text("Search") },
-        shape = RoundedCornerShape(12.dp)
-    )
-}
-
-@Composable
-fun AppsFilter(
-    detachedApps: MutableState<List<DetachedApp>>, renderedApps: MutableState<List<DetachedApp>>
-) {
-    var filterIsDetached by remember { mutableStateOf(false) }
-    OutlinedCard(
-        border = BorderStroke(0.5.dp, if (filterIsDetached) Color.Cyan else Color.Gray),
-        modifier = Modifier.padding(start = 10.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .clip(RectangleShape)
-                .clickable(onClick = {
-                    filterIsDetached = !filterIsDetached
-                    if (filterIsDetached) {
-                        renderedApps.value = detachedApps.value.filter { app -> app.detached }
-                    } else {
-                        renderedApps.value = detachedApps.value
-                    }
-                }),
-
-        ) {
-            Text(
-                "Detached", modifier = Modifier.padding(10.dp), fontSize = 13.sp
-            )
-        }
-    }
-}
 
 data class DetachedApp(
     val packageName: String,
@@ -220,95 +76,213 @@ fun runShell(cmd: String, toaster: Toaster): String {
     if (op.code != 0) {
         toaster.toast("ERROR: " + op.err.joinToString("\n"), Toast.LENGTH_LONG)
         return ""
-    } else {
-        return op.out.joinToString("\n")
+    }
+    return op.out.joinToString("\n")
+}
+
+fun String.splitn() = if (isEmpty()) emptyList() else split('\n')
+
+@Composable
+private fun AppRow(
+    app: DetachedApp,
+    packageManager: PackageManager,
+    uninstalledAppBitmap: ImageBitmap,
+    onDetachedChange: (Boolean) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 5.dp),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().height(82.dp)
+                .clickable { onDetachedChange(!app.detached) }
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val icon = remember(app.packageName, app.installed) {
+                if (app.installed) try {
+                    packageManager.getApplicationIcon(app.packageName).toBitmap(96, 96).asImageBitmap()
+                } catch (_: Exception) { uninstalledAppBitmap } else uninstalledAppBitmap
+            }
+            Image(icon, contentDescription = null, modifier = Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)))
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(app.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.height(3.dp))
+                Text(app.packageName, style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (!app.installed) Text("Not installed", style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.tertiary)
+            }
+            Checkbox(checked = app.detached, onCheckedChange = onDetachedChange)
+        }
     }
 }
 
-fun String.splitn() =
-    if (isEmpty()) emptyList()
-    else this.split('\n')
+@Composable
+private fun DetachScreen(
+    packageManager: PackageManager,
+    apps: MutableState<List<DetachedApp>>,
+    uninstalledAppBitmap: ImageBitmap,
+    onApply: (List<DetachedApp>) -> Unit
+) {
+    var query by remember { mutableStateOf("") }
+    var detachedOnly by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+    val detachedCount = apps.value.count { it.detached }
+    val visibleApps = apps.value.filter { app ->
+        (!detachedOnly || app.detached) &&
+            (app.label.contains(query, true) || app.packageName.contains(query, true))
+    }
+
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        bottomBar = {
+            Surface(shadowElevation = 8.dp, color = MaterialTheme.colorScheme.surface) {
+                Button(
+                    onClick = { onApply(apps.value) },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp).height(54.dp),
+                    shape = RoundedCornerShape(18.dp)
+                ) {
+                    Icon(Icons.Filled.Check, contentDescription = null)
+                    Spacer(Modifier.width(9.dp))
+                    Text("Apply changes", fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.width(8.dp))
+                    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.16f)) {
+                        Text(detachedCount.toString(), modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp),
+                            style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+            }
+        }
+    ) { innerPadding ->
+        Column(Modifier.fillMaxSize().padding(innerPadding)) {
+            Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 8.dp)) {
+                Text("Zygisk Detach", style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                Spacer(Modifier.height(4.dp))
+                Text("Choose which apps should stay out of Play Store updates.",
+                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(15.dp))
+                Card(shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 13.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Selected apps", style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer)
+                            Text(detachedCount.toString(), style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        }
+                        Text(if (detachedCount == 0) "No apps selected" else "Ready to apply",
+                            style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = query, onValueChange = { query = it },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    placeholder = { Text("Search apps or package names") },
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "Search") },
+                    trailingIcon = {
+                        if (query.isNotEmpty()) Icon(Icons.Filled.Close, contentDescription = "Clear search",
+                            modifier = Modifier.clip(CircleShape).clickable { query = ""; focusManager.clearFocus() }.padding(4.dp))
+                    },
+                    shape = RoundedCornerShape(18.dp)
+                )
+                Spacer(Modifier.height(6.dp))
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween) {
+                    FilterChip(selected = detachedOnly, onClick = { detachedOnly = !detachedOnly },
+                        label = { Text("Detached only") })
+                    Text("${visibleApps.size} apps", style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            if (visibleApps.isEmpty()) {
+                Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(36.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(10.dp))
+                        Text(if (query.isNotBlank()) "No matching apps" else "Nothing detached yet",
+                            style = MaterialTheme.typography.titleMedium)
+                        Text("Try another search or change the filter.", style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            } else {
+                LazyColumn(Modifier.fillMaxSize(),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 2.dp, bottom = 12.dp)) {
+                    items(visibleApps, key = { it.packageName }) { app ->
+                        AppRow(app, packageManager, uninstalledAppBitmap) { selected ->
+                            app.detached = selected
+                            apps.value = apps.value.toList()
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 class MainActivity : ComponentActivity() {
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         val toaster = Toaster(applicationContext)
         Shell.setDefaultBuilder(Shell.Builder.create().setFlags(Shell.FLAG_MOUNT_MASTER))
         if (!Shell.getShell().isRoot) {
-            toaster.toast("Not root", Toast.LENGTH_SHORT)
+            toaster.toast("Not root")
             finishAndRemoveTask()
             return
         }
         if (Shell.cmd("test -f /data/adb/modules/zygisk-detach/detach").exec().code != 0) {
-            toaster.toast("zygisk-detach is not installed", Toast.LENGTH_SHORT)
+            toaster.toast("zygisk-detach is not installed")
             finishAndRemoveTask()
             return
         }
 
-        val apps = packageManager.getInstalledPackages(0).mapNotNull {
-            it.applicationInfo?.let { info ->
-                DetachedApp(
-                    it.packageName, packageManager.getApplicationLabel(info).toString()
-                )
+        val apps = packageManager.getInstalledPackages(0).mapNotNull { info ->
+            info.applicationInfo?.let {
+                DetachedApp(info.packageName, packageManager.getApplicationLabel(it).toString())
             }
         }.sortedBy { it.label }.toMutableList()
-        val alDetach: List<String> = try {
+        val detachedFromModule = try {
             runShell("/data/adb/modules/zygisk-detach/detach list", toaster).splitn()
         } catch (_: IndexOutOfBoundsException) {
             runShell("/data/adb/modules/zygisk-detach/detach reset", toaster)
-            listOf()
+            emptyList()
         }
-        for (d in alDetach) {
-            if (apps.find { it.packageName == d } == null) {
-                apps.add(DetachedApp(d, d, detached = true, installed = false))
-            }
+        detachedFromModule.forEach { pkg ->
+            if (apps.none { it.packageName == pkg }) apps.add(
+                DetachedApp(pkg, pkg, detached = true, installed = false)
+            )
         }
-        apps.forEach { it.detached = alDetach.contains(it.packageName) }
-        val appsFinal = apps.sortedBy { it.label }.sortedBy { !it.detached }.toList()
+        apps.forEach { it.detached = detachedFromModule.contains(it.packageName) }
+        val initialApps = apps.sortedBy { it.label }.sortedBy { !it.detached }.toList()
+
         setContent {
-            val detachedApps = remember { mutableStateOf(appsFinal) }
-            val renderedApps = remember { mutableStateOf(appsFinal) }
+            val appState = remember { mutableStateOf(initialApps) }
             ZygiskdetachTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background
-                ) {
-                    Scaffold(topBar = {}, floatingActionButton = {
-                        FloatingActionButton(onClick = {
-                            val detachedList = detachedApps.value.filter { app -> app.detached }
-                                .map { app -> app.packageName }
-                            if (detachedList.isEmpty()) {
+                Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                    DetachScreen(
+                        packageManager = packageManager,
+                        apps = appState,
+                        uninstalledAppBitmap = getDrawable(R.mipmap.unistalled_app)!!.toBitmap(96, 96).asImageBitmap(),
+                        onApply = { currentApps ->
+                            val packages = currentApps.filter { it.detached }.map { it.packageName }
+                            if (packages.isEmpty()) {
                                 runShell("/data/adb/modules/zygisk-detach/detach reset", toaster)
                                 toaster.toast("Emptied the detach list")
                             } else {
-                                val detachStr = detachedList.joinToString(" ")
-                                runShell("/data/adb/modules/zygisk-detach/detach detachall $detachStr", toaster)
+                                runShell("/data/adb/modules/zygisk-detach/detach detachall ${packages.joinToString(" ")}", toaster)
                                 toaster.toast("Detached")
                             }
-                        }, modifier = Modifier) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    Icons.Filled.Check,
-                                    "Detach",
-                                    modifier = Modifier.padding(start = 8.dp)
-                                )
-                                Text("Detach", modifier = Modifier.padding(8.dp))
-                            }
                         }
-                    }, content = {
-                        Box(modifier = Modifier.padding(3.dp)) {
-                            Column {
-                                SearchBar(detachedApps, renderedApps)
-                                AppsFilter(detachedApps, renderedApps)
-                                AppsList(
-                                    packageManager = packageManager,
-                                    renderedApps = renderedApps,
-                                    getDrawable(R.mipmap.unistalled_app)!!.toBitmap().asImageBitmap()
-                                )
-                            }
-                        }
-                    })
+                    )
                 }
             }
         }
