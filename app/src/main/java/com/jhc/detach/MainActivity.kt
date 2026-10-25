@@ -43,7 +43,7 @@ import com.topjohnwu.superuser.Shell
 data class DetachedApp(
     val packageName: String,
     val label: String,
-    val detached: Boolean = false,
+    var detached: Boolean = false,
     val installed: Boolean = true,
     val isSystem: Boolean = false
 )
