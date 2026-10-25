@@ -289,8 +289,38 @@ private fun DetachScreen(
                             tonalElevation = 6.dp,
                             shadowElevation = 8.dp
                         ) {
-                            DropdownMenuItem(text = { Text("Reset filter and sorting") },
-                                onClick = { selectedFilter = AppFilter.ALL; selectedSort = AppSort.SELECTED_FIRST; query = ""; moreMenuExpanded = false })
+                            DropdownMenuItem(
+                                text = { Text("Select All") },
+                                leadingIcon = { Icon(Icons.Filled.Check, contentDescription = null) },
+                                onClick = {
+                                    val visiblePackages = visibleApps.map { it.packageName }.toSet()
+                                    apps.value = apps.value.map { app ->
+                                        if (app.packageName in visiblePackages) app.copy(detached = true) else app
+                                    }
+                                    moreMenuExpanded = false
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Clear Selection") },
+                                leadingIcon = { Icon(Icons.Filled.Close, contentDescription = null) },
+                                onClick = {
+                                    val visiblePackages = visibleApps.map { it.packageName }.toSet()
+                                    apps.value = apps.value.map { app ->
+                                        if (app.packageName in visiblePackages) app.copy(detached = false) else app
+                                    }
+                                    moreMenuExpanded = false
+                                }
+                            )
+                            HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Text("Reset filter and sorting") },
+                                onClick = {
+                                    selectedFilter = AppFilter.ALL
+                                    selectedSort = AppSort.SELECTED_FIRST
+                                    query = ""
+                                    moreMenuExpanded = false
+                                }
+                            )
                         }
                     }
                 }
