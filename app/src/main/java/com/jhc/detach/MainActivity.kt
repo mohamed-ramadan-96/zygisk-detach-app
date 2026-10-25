@@ -110,6 +110,33 @@ private fun AppRow(
     }
 }
 
+
+@Composable
+private fun FilterPill(
+    title: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    icon: androidx.compose.ui.graphics.vector.ImageVector
+) {
+    val foreground = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+    Surface(
+        modifier = Modifier.clip(CircleShape).clickable(onClick = onClick),
+        shape = CircleShape,
+        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+        border = if (selected) null else androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+    ) {
+        Row(
+            Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Icon(icon, contentDescription = null, tint = foreground, modifier = Modifier.size(17.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(title, color = foreground, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+        }
+    }
+}
+
 @Composable
 private fun DetachScreen(
     packageManager: PackageManager,
@@ -123,6 +150,7 @@ private fun DetachScreen(
     var selectedSort by remember { mutableStateOf(AppSort.SELECTED_FIRST) }
     var filterMenuExpanded by remember { mutableStateOf(false) }
     var sortMenuExpanded by remember { mutableStateOf(false) }
+    var moreMenuExpanded by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
     val detachedCount = apps.value.count { it.detached }
 
@@ -148,19 +176,41 @@ private fun DetachScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
-            Surface(shadowElevation = 8.dp, color = MaterialTheme.colorScheme.surface) {
-                Button(
-                    onClick = { onApply(apps.value) },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp).height(54.dp),
-                    shape = RoundedCornerShape(18.dp)
+            Surface(shadowElevation = 10.dp, color = MaterialTheme.colorScheme.surface) {
+                Row(
+                    Modifier.fillMaxWidth().navigationBarsPadding()
+                        .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Filled.Check, contentDescription = null)
-                    Spacer(Modifier.width(9.dp))
-                    Text("Apply changes", fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.width(8.dp))
-                    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.16f)) {
-                        Text(detachedCount.toString(), modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp),
-                            style = MaterialTheme.typography.labelMedium)
+                    Surface(
+                        modifier = Modifier.size(54.dp),
+                        shape = RoundedCornerShape(17.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(Icons.Filled.Check, contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(29.dp))
+                        }
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("$detachedCount apps selected", style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold, maxLines = 1)
+                        Text("Will be detached from Zygisk", style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
+                            overflow = TextOverflow.Ellipsis)
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    Button(
+                        onClick = { onApply(apps.value) },
+                        modifier = Modifier.height(58.dp),
+                        shape = RoundedCornerShape(22.dp),
+                        contentPadding = PaddingValues(horizontal = 17.dp)
+                    ) {
+                        Icon(Icons.Filled.Sort, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(7.dp))
+                        Text("Apply changes", fontWeight = FontWeight.SemiBold, maxLines = 1)
                     }
                 }
             }
@@ -169,72 +219,57 @@ private fun DetachScreen(
         Column(Modifier.fillMaxSize().padding(innerPadding)) {
             Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 8.dp)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Image(bitmap = appLogo, contentDescription = "Zygisk Detach logo", modifier = Modifier.size(56.dp))
+                    Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Image(bitmap = appLogo, contentDescription = "Zygisk Detach logo", modifier = Modifier.size(56.dp))
-                            Spacer(Modifier.width(12.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text("Zygisk Detach", style = MaterialTheme.typography.headlineSmall,
-                                    fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground,
-                                    maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text("Detach selected apps from Zygisk", style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            }
-                        }
-                        Spacer(Modifier.height(4.dp))
-                        Text("Choose which apps should stay out of Play Store updates.",
-                            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Zygisk Detach", style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("Detach selected apps from Zygisk", style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
+                            overflow = TextOverflow.Ellipsis)
                     }
                     Box {
-                        IconButton(onClick = { filterMenuExpanded = true }) {
-                            Icon(Icons.Filled.FilterList, contentDescription = "Filter apps",
-                                tint = if (selectedFilter != AppFilter.ALL) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurface)
+                        Surface(Modifier.size(44.dp).clip(CircleShape).clickable { filterMenuExpanded = true },
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = CircleShape) {
+                            Box(contentAlignment = Alignment.Center) { Icon(Icons.Filled.FilterList, "Filter apps") }
                         }
                         DropdownMenu(expanded = filterMenuExpanded, onDismissRequest = { filterMenuExpanded = false }) {
                             AppFilter.values().forEach { filter ->
-                                DropdownMenuItem(
-                                    text = { Text(filter.title) },
+                                DropdownMenuItem(text = { Text(filter.title) },
                                     leadingIcon = { if (selectedFilter == filter) Icon(Icons.Filled.Check, null) },
-                                    onClick = { selectedFilter = filter; filterMenuExpanded = false }
-                                )
+                                    onClick = { selectedFilter = filter; filterMenuExpanded = false })
                             }
                         }
                     }
+                    Spacer(Modifier.width(6.dp))
                     Box {
-                        IconButton(onClick = { sortMenuExpanded = true }) {
-                            Icon(Icons.Filled.Sort, contentDescription = "Sort apps",
-                                tint = if (selectedSort != AppSort.SELECTED_FIRST) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurface)
+                        Surface(Modifier.size(44.dp).clip(CircleShape).clickable { sortMenuExpanded = true },
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = CircleShape) {
+                            Box(contentAlignment = Alignment.Center) { Icon(Icons.Filled.Sort, "Sort apps") }
                         }
                         DropdownMenu(expanded = sortMenuExpanded, onDismissRequest = { sortMenuExpanded = false }) {
                             AppSort.values().forEach { sort ->
-                                DropdownMenuItem(
-                                    text = { Text(sort.title) },
+                                DropdownMenuItem(text = { Text(sort.title) },
                                     leadingIcon = { Checkbox(checked = selectedSort == sort, onCheckedChange = null) },
-                                    onClick = { selectedSort = sort; sortMenuExpanded = false }
-                                )
+                                    onClick = { selectedSort = sort; sortMenuExpanded = false })
                             }
                         }
                     }
-                }
-                Spacer(Modifier.height(15.dp))
-                Card(shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 13.dp),
-                        verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text("Selected apps", style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer)
-                            Text(detachedCount.toString(), style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Spacer(Modifier.width(6.dp))
+                    Box {
+                        Surface(Modifier.size(44.dp).clip(CircleShape).clickable { moreMenuExpanded = true },
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = CircleShape) {
+                            Box(contentAlignment = Alignment.Center) { Icon(Icons.Filled.MoreVert, "More options") }
                         }
-                        Text(if (detachedCount == 0) "No apps selected" else "Ready to apply",
-                            style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        DropdownMenu(expanded = moreMenuExpanded, onDismissRequest = { moreMenuExpanded = false }) {
+                            DropdownMenuItem(text = { Text("User apps") },
+                                onClick = { selectedFilter = AppFilter.USER; moreMenuExpanded = false })
+                            DropdownMenuItem(text = { Text("Reset filter and sorting") },
+                                onClick = { selectedFilter = AppFilter.ALL; selectedSort = AppSort.SELECTED_FIRST; query = ""; moreMenuExpanded = false })
+                        }
                     }
                 }
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(18.dp))
                 OutlinedTextField(
                     value = query, onValueChange = { query = it },
                     modifier = Modifier.fillMaxWidth(), singleLine = true,
@@ -245,15 +280,21 @@ private fun DetachScreen(
                     },
                     shape = RoundedCornerShape(18.dp)
                 )
-                Spacer(Modifier.height(8.dp))
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("${selectedFilter.title} · ${selectedSort.title}",
-                        style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("${visibleApps.size} apps", style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(7.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    FilterPill("All apps", selectedFilter == AppFilter.ALL, { selectedFilter = AppFilter.ALL }, Icons.Filled.Android)
+                    FilterPill("Detached only", selectedFilter == AppFilter.DETACHED, { selectedFilter = AppFilter.DETACHED }, Icons.Filled.Check)
+                    FilterPill("System apps", selectedFilter == AppFilter.SYSTEM, { selectedFilter = AppFilter.SYSTEM }, Icons.Filled.Android)
                 }
+                Spacer(Modifier.height(7.dp))
+                Text("${visibleApps.size} apps",
+                    modifier = Modifier.align(Alignment.End),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (visibleApps.isEmpty()) {
                 Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
