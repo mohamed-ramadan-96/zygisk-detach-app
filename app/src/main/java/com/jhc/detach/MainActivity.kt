@@ -11,6 +11,8 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -19,7 +21,6 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Android
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
@@ -37,6 +38,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
+import androidx.core.view.WindowCompat
 import com.jhc.detach.ui.theme.ZygiskdetachTheme
 import com.topjohnwu.superuser.Shell
 
@@ -153,6 +155,8 @@ private fun DetachScreen(
     var moreMenuExpanded by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
     val detachedCount = apps.value.count { it.detached }
+    // Keep "Selected first" order stable while the user is editing; refresh it only after Apply.
+    var appliedSelection by remember { mutableStateOf(apps.value.associate { it.packageName to it.detached }) }
 
     val visibleApps = apps.value.filter { app ->
         val matchesFilter = when (selectedFilter) {
@@ -167,7 +171,8 @@ private fun DetachScreen(
             AppSort.NAME_ASC -> filtered.sortedBy { it.label.lowercase() }
             AppSort.NAME_DESC -> filtered.sortedByDescending { it.label.lowercase() }
             AppSort.SELECTED_FIRST -> filtered.sortedWith(
-                compareByDescending<DetachedApp> { it.detached }.thenBy { it.label.lowercase() }
+                compareByDescending<DetachedApp> { appliedSelection[it.packageName] == true }
+                    .thenBy { it.label.lowercase() }
             )
             AppSort.PACKAGE_NAME -> filtered.sortedBy { it.packageName.lowercase() }
         }
@@ -203,7 +208,11 @@ private fun DetachScreen(
                     }
                     Spacer(Modifier.width(10.dp))
                     Button(
-                        onClick = { onApply(apps.value) },
+                        onClick = {
+                            val current = apps.value
+                            onApply(current)
+                            appliedSelection = current.associate { it.packageName to it.detached }
+                        },
                         modifier = Modifier.height(58.dp),
                         shape = RoundedCornerShape(22.dp),
                         contentPadding = PaddingValues(horizontal = 17.dp)
@@ -229,20 +238,6 @@ private fun DetachScreen(
                             overflow = TextOverflow.Ellipsis)
                     }
                     Box {
-                        Surface(Modifier.size(44.dp).clip(CircleShape).clickable { filterMenuExpanded = true },
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = CircleShape) {
-                            Box(contentAlignment = Alignment.Center) { Icon(Icons.Filled.FilterList, "Filter apps") }
-                        }
-                        DropdownMenu(expanded = filterMenuExpanded, onDismissRequest = { filterMenuExpanded = false }) {
-                            AppFilter.values().forEach { filter ->
-                                DropdownMenuItem(text = { Text(filter.title) },
-                                    leadingIcon = { if (selectedFilter == filter) Icon(Icons.Filled.Check, null) },
-                                    onClick = { selectedFilter = filter; filterMenuExpanded = false })
-                            }
-                        }
-                    }
-                    Spacer(Modifier.width(6.dp))
-                    Box {
                         Surface(Modifier.size(44.dp).clip(CircleShape).clickable { sortMenuExpanded = true },
                             color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = CircleShape) {
                             Box(contentAlignment = Alignment.Center) { Icon(Icons.Filled.Sort, "Sort apps") }
@@ -262,8 +257,6 @@ private fun DetachScreen(
                             Box(contentAlignment = Alignment.Center) { Icon(Icons.Filled.MoreVert, "More options") }
                         }
                         DropdownMenu(expanded = moreMenuExpanded, onDismissRequest = { moreMenuExpanded = false }) {
-                            DropdownMenuItem(text = { Text("User apps") },
-                                onClick = { selectedFilter = AppFilter.USER; moreMenuExpanded = false })
                             DropdownMenuItem(text = { Text("Reset filter and sorting") },
                                 onClick = { selectedFilter = AppFilter.ALL; selectedSort = AppSort.SELECTED_FIRST; query = ""; moreMenuExpanded = false })
                         }
@@ -282,11 +275,12 @@ private fun DetachScreen(
                 )
                 Spacer(Modifier.height(12.dp))
                 Row(
-                    Modifier.fillMaxWidth(),
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(7.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     FilterPill("All apps", selectedFilter == AppFilter.ALL, { selectedFilter = AppFilter.ALL }, Icons.Filled.Android)
+                    FilterPill("User apps", selectedFilter == AppFilter.USER, { selectedFilter = AppFilter.USER }, Icons.Filled.Android)
                     FilterPill("Detached only", selectedFilter == AppFilter.DETACHED, { selectedFilter = AppFilter.DETACHED }, Icons.Filled.Check)
                     FilterPill("System apps", selectedFilter == AppFilter.SYSTEM, { selectedFilter = AppFilter.SYSTEM }, Icons.Filled.Android)
                 }
@@ -329,6 +323,10 @@ class MainActivity : ComponentActivity() {
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Keep status/navigation system icons visible on the dark app background.
+        WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = false
+        WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightNavigationBars = false
+        window.statusBarColor = android.graphics.Color.rgb(15, 15, 17)
         val toaster = Toaster(applicationContext)
         Shell.setDefaultBuilder(Shell.Builder.create().setFlags(Shell.FLAG_MOUNT_MASTER))
         if (!Shell.getShell().isRoot) {
